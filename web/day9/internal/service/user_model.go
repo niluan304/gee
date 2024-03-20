@@ -1,4 +1,4 @@
-package model
+package service
 
 type (
 	UserAddReq struct {

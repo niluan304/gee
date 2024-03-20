@@ -8,6 +8,6 @@ hidden: false
 comments: true
 draft: false
 math: false
-tags: [web,gee,gin,goframe]
+tags: [web,gee,gin]
 categories: go
 ---

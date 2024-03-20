@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 
-	"gee/web/day8/internal/model"
 	"gee/web/day8/internal/service"
 )
 
@@ -12,7 +11,7 @@ var User = &user{}
 type user struct{}
 
 func (c *user) Add(ctx context.Context, bind func(point any) (err error)) (data any, err error) {
-	var req model.UserAddReq
+	var req service.UserAddReq
 	err = bind(&req) // 请求数据的反序列化
 	if err != nil {
 		return nil, err
@@ -31,7 +30,7 @@ func (c *user) Get(
 	data any, // 返回的数据
 	err error, // 错误处理
 ) {
-	var req model.UserGetReq
+	var req service.UserGetReq
 	err = bind(&req) // 通过闭包反序列化 req
 	if err != nil {
 		return nil, err

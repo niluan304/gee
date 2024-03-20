@@ -8,7 +8,7 @@ hidden: false
 comments: true
 draft: false
 math: false
-tags: [gee,web,gin,goframe]
+tags: [gee,web,gin]
 categories: go
 ---
 
@@ -90,15 +90,15 @@ func (c *user) Get(ctx *gin.Context) {
 ## 分层设计
 先介绍下分层后的目录结构：
 ```sh
+.
+|-- go.mod
+|-- go.sum
 |-- internal
 |   |-- controller
 |   |   `-- user.go
-|   |-- model
-|   |   `-- user.go
 |   `-- service
-|       `-- user.go
-|-- go.mod
-|-- go.sum
+|       |-- user.go
+|       `-- user_model.go
 `-- main.go
 ```
 
@@ -106,11 +106,11 @@ func (c *user) Get(ctx *gin.Context) {
 
 `controller` 层的主要代码：
 ```go
-// ./controller/user.go
+// ./internal/controller/user.go
 
 func (c *user) Add(ctx *gin.Context) {
 	// 请求数据的反序列化
-	var req model.UserAddReq
+	var req service.UserAddReq
 	err := ctx.ShouldBind(&req)
 	if err != nil {
 		ctx.JSON(http.StatusOK, Response{400, err.Error(), nil})
@@ -123,12 +123,12 @@ func (c *user) Add(ctx *gin.Context) {
 	}
 
 	// 填写响应内容
-	ctx.JSON(http.StatusOK, Response{200, nil, res})
+	ctx.JSON(http.StatusOK, Response{200, "", res})
 	return
 }
 
 func (c *user) Get(ctx *gin.Context) {
-	var req model.UserGetReq
+	var req service.UserGetReq
 	err := ctx.ShouldBind(&req)
 	if err != nil {
 		ctx.JSON(http.StatusOK, Response{400, err.Error(), nil})
@@ -142,28 +142,28 @@ func (c *user) Get(ctx *gin.Context) {
 	}
 
 	// 填写响应内容
-	ctx.JSON(http.StatusOK, Response{200, nil, res})
+	ctx.JSON(http.StatusOK, Response{200, "", res})
 	return
 }
 ```
 
 `service` 层的主要代码：
 ```go
-// ./service/user.go
+// ./internal/service/user.go
 
-func (s *user) Add(ctx context.Context, req model.UserAddReq) (res *model.UserAddRes, err error) {
-	// 插入数据，database 只是一个切片 []Row，用于充当数据库
+func (s *user) Add(ctx context.Context, req UserAddReq) (res *UserAddRes, err error) {
+	// 插入数据
 	database = append(database, Row{req.Name, req.Age, req.Job})
 	return
 }
 
-func (s *user) Get(ctx context.Context, req model.UserGetReq) (res *model.UserGetRes, err error) {
-	// 查询数据，database 只是一个切片 []Row，用于充当数据库
+func (s *user) Get(ctx context.Context, req UserGetReq) (res *UserGetRes, err error) {
+	// 查询数据
 	i := slices.IndexFunc(database, func(row Row) bool { return row.Name == req.Name })
 	if i != -1 {
 		// 填写响应内容
 		row := database[i]
-		return &model.UserGetRes{Name: row.Name, Age: row.Age, Job: row.Job}, nil
+		return &UserGetRes{Name: row.Name, Age: row.Age, Job: row.Job}, nil
 	}
 	return
 }
@@ -172,6 +172,8 @@ func (s *user) Get(ctx context.Context, req model.UserGetReq) (res *model.UserGe
 分层后的总代码行数有所增加，甚至 `controller` 错误处理变得更繁琐了，但是整个项目的布局变得更清晰了，业务代码也不会受到 web框架的干扰，可以集中处理业务。
 
 更可贵的是，`service` 层的方法在调用时，就可以知道所需要的参数，以及返回的值。不过有些读者可能会有疑问，为什么 `service` 层方法的第一个参数都是 `ctx context.Context`，即便代码中未必使用，这算是 `go` 语言在 web 开发中的特色（也可能是技术债），用于并发控制和上下文信息传递的，有兴趣可以自行了解下。
+
+
 
 ## 小结
 本章节介绍下「分层设计」与「单一职责」的联系，并说明如何通过分层设计将业务代码与 web框架解耦。

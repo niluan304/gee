@@ -8,7 +8,7 @@ hidden: false
 comments: true
 draft: false
 math: false
-tags: [gee,web,gin,goframe]
+tags: [gee,web,gin]
 categories: go
 ---
 
@@ -26,7 +26,7 @@ categories: go
 
 不知道是否有读者会好奇 `Get` 方法里的搜索函数：
 ```go
-// ./web/day8/internal/service/user.go
+// ./day8/internal/service/user.go
 
 i := slices.IndexFunc(database, func(row Row) bool { 
     return row.Name == req.Name
@@ -48,7 +48,7 @@ func IndexFunc[S ~[]E, E any](s S, f func(E) bool) int {
 }
 ```
 
-但让我们换个角度思考，对于 `slices.IndexFunc` 来说，它并不关心 `s` 的元素，只需要调用传入的闭包，就完成了任务。回到反序列化这里，能否让外部传入一个闭包，让闭包帮 `controller` 层所需的参数反序列化呢？答案是可以的，只需要修改 `controller` 的入参为：
+但让我们换个角度思考，对于 `slices.IndexFunc` 来说，它并不关心 `s` 里的元素，只关心 `f(s[i])` 的结果，因此只需要调用传入的闭包，就完成了任务。同样地，对于 `controller` 层来说，只关心反序列化 `var req service.UserGetReq`。那么能否仿照 `slices.IndexFunc` 让外部传入一个闭包，让闭包帮 `controller` 层反序列化 `req`呢？答案是可以的，只需要修改 `controller` 的入参为：
 ```go
 func (c *user) Get(
 	ctx context.Context,               // 第一个参数：ctx
@@ -57,7 +57,7 @@ func (c *user) Get(
 	data any,  // 返回的数据
 	err error, // 错误处理
 ){
-	var req model.UserGetReq
+	var req service.UserGetReq
 	err = bind(&req) // 通过闭包反序列化 req
 	if err != nil {
 		return nil, err

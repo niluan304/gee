@@ -3,7 +3,6 @@ package controller
 import (
 	"net/http"
 
-	"gee/web/day8/internal/model"
 	"gee/web/day8/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -21,7 +20,7 @@ type user struct{}
 
 func (c *user) Add(ctx *gin.Context) {
 	// 请求数据的反序列化
-	var req model.UserAddReq
+	var req service.UserAddReq
 	err := ctx.ShouldBind(&req)
 	if err != nil {
 		ctx.JSON(http.StatusOK, Response{400, err.Error(), nil})
@@ -39,7 +38,7 @@ func (c *user) Add(ctx *gin.Context) {
 }
 
 func (c *user) Get(ctx *gin.Context) {
-	var req model.UserGetReq
+	var req service.UserGetReq
 	err := ctx.ShouldBind(&req)
 	if err != nil {
 		ctx.JSON(http.StatusOK, Response{400, err.Error(), nil})
