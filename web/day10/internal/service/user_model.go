@@ -21,3 +21,17 @@ type (
 		Job  string `json:"job"`
 	}
 )
+
+type (
+	UserUpdateReq struct {
+		Name string `json:"name"`
+		Age  int    `json:"age"`
+		Job  string `json:"job"`
+	}
+
+	UserUpdateRes struct {
+		Name string `json:"name"`
+		Age  int    `json:"age"`
+		Job  string `json:"job"`
+	}
+)

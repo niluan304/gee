@@ -1,6 +1,6 @@
 ---
 title: "gee-web-day7.5 「7天 web框架」读后感"
-description: "An Idea: 将 gin 改造为 GoFrame"
+description: "一个想法: 将 gin 改造为 GoFrame"
 date: 2023-12-19T11:27:57+08:00
 image: 
 license: 
@@ -53,6 +53,7 @@ func (ctx context.Context, req *{Prefix}Req) (res *{Prefix}Res, err error){
 ```
 
 带着疑问，笔者探究了两个框架之间的差异，并尝试将 `gin` 的接口改造为 `GoFrame` 格式。
-总结后可以概括为两个部分，这算是「7天教程」的读后感，笔者也仿照命名为：
+总结后可以概括为三个部分，这算是「7天教程」的读后感，笔者也仿照命名为：
 - day8 分层设计的必要性
 - day9 反序列化与解耦
+- day10 通过反射构造规范路由

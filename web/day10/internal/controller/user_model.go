@@ -1,21 +1,13 @@
-package service
+package controller
 
 type (
-	UserAddReq struct {
+	UserUpsertReq struct {
 		Name string `json:"name"`
 		Age  int    `json:"age"`
 		Job  string `json:"job"`
 	}
 
-	UserAddRes struct{}
-)
-
-type (
-	UserGetReq struct {
-		Name string `form:"name"`
-	}
-
-	UserGetRes struct {
+	UserUpsertRes struct {
 		Name string `json:"name"`
 		Age  int    `json:"age"`
 		Job  string `json:"job"`

@@ -85,16 +85,18 @@ func (c *user) Get(
 
 和上面的图片类似，修改后的函数类型已经和框架要求的 `gin.HandlerFunc` 截然不同，但借鉴适配器模式的思想，通过中间函数转化，就可以了：
 ```go
+// ./handle/handle.go
+
 // 设置为类型，用于优化参数显示
-type binderFunc func(
-	ctx context.Context,              // 第一个参数：ctx
+type BinderFunc = func(
+	ctx context.Context,               // 第一个参数：ctx
 	bind func(point any) (err error), // 第二个参数：用于反序列化的闭包
 ) (
 	data any,  // 返回的数据
 	err error, // 错误处理
 )
 
-func HandlerFunc(binder binderFunc) gin.HandlerFunc {
+func Handle(binder BinderFunc) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		data, err := binder(c, func(point any) (err error) {
 			// 实现反序列化
@@ -108,23 +110,32 @@ func HandlerFunc(binder binderFunc) gin.HandlerFunc {
 		c.JSON(http.StatusOK, Response{200, "", data})
 	}
 }
+
 ```
 
-相应的，路由注册也有些变化：
+新的函数作为「适配器」，也会被其他路由调用，也不是业务相关的内容，不适合放到 `interna`l 包，应当放到新的包（文件夹）里，笔者将之保存至 `/handle/handle.go`。
+
+相应地，路由注册也有些变化：
 ```go
 func main() {
 	r := gin.Default()
 	{
 		user := r.Group("/user")
-		user.GET("/", handle.Handler(controller.User.Get))
-		user.POST("/", handle.Handler(controller.User.Add))
+		user.GET("/", handle.Handle(controller.User.Get))  
+		user.POST("/", handle.Handle(controller.User.Add))
 	}
 
 	r.Run() // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
 }
 ```
 
-至此，我们就完成了错误处理和数据返回的统一，不需要在其他地方手写 `c.JSON(http.StatusOK, Response{Code: 400, Msg: err.Error(), Data: nil})` 和 `c.JSON(http.StatusOK, Response{200, "", data})` 了。
+对比 day8 的注册模式：
+```go
+user.GET("/", controller.User.Get)  // 函数签名：func (c *user) Get(ctx *gin.Context)
+user.POST("/", controller.User.Add) // 函数签名：func (c *user) Add(ctx *gin.Context)
+```
+
+虽然注册路由时，必须得借用 `handle.Handle` 才能转化为 `gin.HandlerFunc`，但是可以不用在 `controller`层里写 `c.JSON(http.StatusOK, Response{Code: 400, Msg: err.Error(), Data: nil})` 和 `c.JSON(http.StatusOK, Response{200, "", data})` 了。至此，我们就完成了错误处理和数据返回的统一。
 
 
 
@@ -134,21 +145,24 @@ func main() {
 2. 借鉴适配器模式，将 `binderFunc` 函数转化为框架所需要的类型，并实现错误处理和数据返回的统一。
 
 运行结果也没有变化：
-```sh
+```go
+func client() {
+	time.Sleep(time.Second) // 等待路由注册
 
-curl -X GET "http://localhost:8080/user?name=Carol"
-# {"code":200,"msg":"","database":null}
+	resp1, _ := http.Get("http://localhost:8080/user?name=Carol")
+	resp2, _ := http.Get("http://localhost:8080/user?name=Bob")
+	resp3, _ := http.Post("http://localhost:8080/user", "application/json", bytes.NewBufferString(`{"name":"Carol","age":44,"job":"worker"}`))
+	resp4, _ := http.Get("http://localhost:8080/user?name=Carol")
 
-curl -X GET "http://localhost:8080/user?name=Bob"
-# {"code":200,"msg":"","database":{"Name":"Bob","Age":30,"Job":"driver"}}
+	for _, resp := range []*http.Response{resp1, resp2, resp3, resp4} {
+		data, _ := io.ReadAll(resp.Body)
+		fmt.Println(string(data))
+	}
 
-curl -X POST "http://localhost:8080/user?name=Carol&age=44&job=worker"
-# {"code":200,"msg":"","database":null}
-
-curl -X GET "http://localhost:8080/user?name=Carol"
-# {"code":200,"msg":"","database":{"Name":"Carol","Age":44,"Job":"worker"}}
+	// Output:
+	// {"code":200,"msg":"","data":null}
+	// {"code":200,"msg":"","data":{"Name":"Bob","Age":30,"Job":"driver"}}
+	// {"code":200,"msg":"","data":null}
+	// {"code":200,"msg":"","data":{"Name":"Carol","Age":44,"Job":"worker"}}
+}
 ```
-
-
-
- 

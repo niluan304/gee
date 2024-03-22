@@ -110,7 +110,7 @@ func (c *user) Get(ctx *gin.Context) {
 
 func (c *user) Add(ctx *gin.Context) {
 	// 请求数据的反序列化
-	var req service.UserAddReq
+	var req *service.UserAddReq
 	err := ctx.ShouldBind(&req)
 	if err != nil {
 		ctx.JSON(http.StatusOK, Response{400, err.Error(), nil})
@@ -128,7 +128,7 @@ func (c *user) Add(ctx *gin.Context) {
 }
 
 func (c *user) Get(ctx *gin.Context) {
-	var req service.UserGetReq
+	var req *service.UserGetReq
 	err := ctx.ShouldBind(&req)
 	if err != nil {
 		ctx.JSON(http.StatusOK, Response{400, err.Error(), nil})
@@ -151,13 +151,13 @@ func (c *user) Get(ctx *gin.Context) {
 ```go
 // ./internal/service/user.go
 
-func (s *user) Add(ctx context.Context, req UserAddReq) (res *UserAddRes, err error) {
+func (s *user) Add(ctx context.Context, req *UserAddReq) (res *UserAddRes, err error) {
 	// 插入数据
 	database = append(database, Row{req.Name, req.Age, req.Job})
 	return
 }
 
-func (s *user) Get(ctx context.Context, req UserGetReq) (res *UserGetRes, err error) {
+func (s *user) Get(ctx context.Context, req *UserGetReq) (res *UserGetRes, err error) {
 	// 查询数据
 	i := slices.IndexFunc(database, func(row Row) bool { return row.Name == req.Name })
 	if i != -1 {
@@ -182,17 +182,24 @@ func (s *user) Get(ctx context.Context, req UserGetReq) (res *UserGetRes, err er
 
 
 最后让我们来看看程序的运行结果：
-```sh
+```go
+func client() {
+	time.Sleep(time.Second) // 等待路由注册
 
-curl -X GET "http://localhost:8080/user?name=Carol"
-# {"code":200,"msg":"","database":null}
+	resp1, _ := http.Get("http://localhost:8080/user?name=Carol")
+	resp2, _ := http.Get("http://localhost:8080/user?name=Bob")
+	resp3, _ := http.Post("http://localhost:8080/user", "application/json", bytes.NewBufferString(`{"name":"Carol","age":44,"job":"worker"}`))
+	resp4, _ := http.Get("http://localhost:8080/user?name=Carol")
 
-curl -X GET "http://localhost:8080/user?name=Bob"
-# {"code":200,"msg":"","database":{"Name":"Bob","Age":30,"Job":"driver"}}
+	for _, resp := range []*http.Response{resp1, resp2, resp3, resp4} {
+		data, _ := io.ReadAll(resp.Body)
+		fmt.Println(string(data))
+	}
 
-curl -X POST "http://localhost:8080/user?name=Carol&age=44&job=worker"
-# {"code":200,"msg":"","database":null}
-
-curl -X GET "http://localhost:8080/user?name=Carol"
-# {"code":200,"msg":"","database":{"Name":"Carol","Age":44,"Job":"worker"}}
+	// Output:
+	// {"code":200,"msg":"","data":null}
+	// {"code":200,"msg":"","data":{"Name":"Bob","Age":30,"Job":"driver"}}
+	// {"code":200,"msg":"","data":null}
+	// {"code":200,"msg":"","data":{"Name":"Carol","Age":44,"Job":"worker"}}
+}
 ```

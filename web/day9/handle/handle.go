@@ -7,8 +7,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 设置为类型，用于优化参数显示
-type binderFunc func(
+type Response struct {
+	Code int    `json:"code"` // 业务代码，200 表示 OK，其他表示错误
+	Msg  string `json:"msg"`  // 错误消息
+	Data any    `json:"data"` // 返回的数据
+}
+
+type BinderFunc = func(
 	ctx context.Context, // 第一个参数：ctx
 	bind func(point any) (err error), // 第二个参数：用于反序列化的闭包
 ) (
@@ -16,7 +21,7 @@ type binderFunc func(
 	err error, // 错误处理
 )
 
-func Handler(binder binderFunc) gin.HandlerFunc {
+func Handle(binder BinderFunc) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		data, err := binder(c, func(point any) (err error) {
 			// 实现反序列化
@@ -29,10 +34,4 @@ func Handler(binder binderFunc) gin.HandlerFunc {
 
 		c.JSON(http.StatusOK, Response{200, "", data})
 	}
-}
-
-type Response struct {
-	Code int    `json:"code"` // 业务代码，200 表示 OK，其他表示错误
-	Msg  string `json:"msg"`  // 错误消息
-	Data any    `json:"data"` // 返回的数据
 }

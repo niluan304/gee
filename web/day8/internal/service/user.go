@@ -21,13 +21,13 @@ var User = &user{}
 
 type user struct{}
 
-func (s *user) Add(ctx context.Context, req UserAddReq) (res *UserAddRes, err error) {
+func (s *user) Add(ctx context.Context, req *UserAddReq) (res *UserAddRes, err error) {
 	// 插入数据
 	database = append(database, Row{req.Name, req.Age, req.Job})
 	return
 }
 
-func (s *user) Get(ctx context.Context, req UserGetReq) (res *UserGetRes, err error) {
+func (s *user) Get(ctx context.Context, req *UserGetReq) (res *UserGetRes, err error) {
 	// 查询数据
 	i := slices.IndexFunc(database, func(row Row) bool { return row.Name == req.Name })
 	if i != -1 {
