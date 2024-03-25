@@ -240,4 +240,8 @@ func ObjectHandler(object any) (handles []gin.HandlerFunc) {
 }
 ```
 
-通过对象注册路由有个缺点，难以为 `HandlerFunc` 绑定 `path` 和 `method`。`GoFrame` 的解决方式是在 `Req`（第二个请求参数）里写 `go tag`，有兴趣的读者，可以察看[「文档：规范参数结构」](https://goframe.org/pages/viewpage.action?pageId=116004922#id-规范路由如何使用-规范参数结构)或自己实现（[`GoFrame` 源码参考](https://github.com/gogf/gf/blob/313d9d138f96b0ed460d47684298a7fb26d3fd75/net/ghttp/ghttp_server_service_object.go#L132)。
+但是通过对象注册路由有个缺点，难以为 **`HandlerFunc`** 绑定 `path` 和 `method`。
+
+已知的解决方式：
+1. `GoFrame` 是在 `Req`（第二个请求参数）里写 `go tag`，有兴趣的读者，可以查看[「文档：规范参数结构」](https://goframe.org/pages/viewpage.action?pageId=116004922#id-规范路由如何使用-规范参数结构)或自己实现（[`GoFrame` 源码参考](https://github.com/gogf/gf/blob/313d9d138f96b0ed460d47684298a7fb26d3fd75/net/ghttp/ghttp_server_service_object.go#L132)）。
+2. `iris` 则要求方法名（函数名）的格式为：请求方法+请求路径，如 `GetHelloWorld` 对应 `GET: /hello/world`，示例：[examples/mvc/hello-world/main.go](https://github.com/iris-contrib/examples/blob/master/mvc/hello-world/main.go)

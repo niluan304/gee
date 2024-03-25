@@ -112,8 +112,14 @@ func NewReqResFunc(reqRes any) *ReqResFunc {
 // 这个结构体的所有方法都必须为 `ReqResFunc` 格式，否则会触发 panic
 //
 // TODO 解决缺陷：无法为 handles[i] 绑定 `path` 和 `method`
-// 可行的解决方法：
-// 1. 在请求参数 `XXXReq` 里写 tag，参考：https://github.com/gogf/gf/blob/313d9d138f96b0ed460d47684298a7fb26d3fd75/net/ghttp/ghttp_server_service_object.go#L132
+//
+// 已知的解决方法：
+//
+// 1. 在请求参数 `XXXReq` 里写 tag，
+// 参考：[规范参数结构](https://goframe.org/pages/viewpage.action?pageId=116004922)
+//
+// 2. 要求函数名格式为 请求方法+请求路径，如 `GetHelloWorld` 对应 `GET: /hello/world`，
+// 参考：[examples/mvc/hello-world/main.go](https://github.com/iris-contrib/examples/blob/master/mvc/hello-world/main.go)
 func ObjectHandler(object any) (handles []gin.HandlerFunc) {
 	v := reflect.ValueOf(object)
 
