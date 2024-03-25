@@ -8,7 +8,7 @@ hidden: false
 comments: true
 draft: false
 math: false
-tags: [gee,web,goframe]
+tags: [gee,web]
 categories: go
 ---
 
@@ -230,9 +230,8 @@ func ObjectHandler(object any) (handles []gin.HandlerFunc) {
 		panic("v.Kind() must be reflect.Pointer")
 	}
 
-	t := v.Type()
 	for i := 0; i < t.NumMethod(); i++ {
-		fn := v.MethodByName(t.Method(i).Name) // 所有方法都必须为 ReqResFunc 类型
+		fn := v.Method(i) // 所有方法都必须为 ReqResFunc 类型
 		handles = append(handles, ReqResHandle(fn.Interface()))
 	}
 
@@ -245,3 +244,5 @@ func ObjectHandler(object any) (handles []gin.HandlerFunc) {
 已知的解决方式：
 1. `GoFrame` 是在 `Req`（第二个请求参数）里写 `go tag`，有兴趣的读者，可以查看[「文档：规范参数结构」](https://goframe.org/pages/viewpage.action?pageId=116004922#id-规范路由如何使用-规范参数结构)或自己实现（[`GoFrame` 源码参考](https://github.com/gogf/gf/blob/313d9d138f96b0ed460d47684298a7fb26d3fd75/net/ghttp/ghttp_server_service_object.go#L132)）。
 2. `iris` 则要求方法名（函数名）的格式为：请求方法+请求路径，如 `GetHelloWorld` 对应 `GET: /hello/world`，示例：[examples/mvc/hello-world/main.go](https://github.com/iris-contrib/examples/blob/master/mvc/hello-world/main.go)
+
+笔者也做了简单的实现：[gee/web/day10/handle/handle_test.go](https://github.com/niluan304/gee/blob/main/web/day10/handle/handle_test.go)，这里就不再赘述了。

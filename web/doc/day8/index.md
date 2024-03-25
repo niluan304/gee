@@ -8,7 +8,7 @@ hidden: false
 comments: true
 draft: false
 math: false
-tags: [gee,web,gin]
+tags: [gee,web]
 categories: go
 ---
 
