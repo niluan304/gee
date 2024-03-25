@@ -31,20 +31,39 @@ func main() {
 func client() {
 	time.Sleep(time.Second) // 等待路由注册
 
-	resp1, _ := http.Get("http://localhost:8080/user?name=Carol")
-	resp2, _ := http.Get("http://localhost:8080/user?name=Bob")
-	resp3, _ := http.Post("http://localhost:8080/user", "application/json", bytes.NewBufferString(`{"name":"Carol","age":44,"job":"worker"}`))
-	resp4, _ := http.Get("http://localhost:8080/user?name=Carol")
-	resp5, _ := http.Post("http://localhost:8080/user/upsert", "application/json", bytes.NewBufferString(`{"name":"Dave","age":32,"job":"nurse"}`))
-	resp6, _ := http.Post("http://localhost:8080/user/upsert", "application/json", bytes.NewBufferString(`{"name":"Dave","age":35,"job":"doctor"}`))
-	resp7, _ := http.Get("http://localhost:8080/user?name=Dave")
+	reqs := []func(host string) (*http.Response, error){
+		func(host string) (*http.Response, error) { return http.Get(host + "/user?name=Carol") },
+		func(host string) (*http.Response, error) { return http.Get(host + "/user?name=Bob") },
+		func(host string) (*http.Response, error) {
+			return http.Post(host+"/user", "application/json", bytes.NewBufferString(`{"name":"Carol","age":44,"job":"worker"}`))
+		},
+		func(host string) (*http.Response, error) { return http.Get(host + "/user?name=Carol") },
 
-	for _, resp := range []*http.Response{resp1, resp2, resp3, resp4, resp5, resp6, resp7} {
-		data, _ := io.ReadAll(resp.Body)
+		// 测试 upsert 接口
+		func(host string) (*http.Response, error) {
+			return http.Post(host+"/user/upsert", "application/json", bytes.NewBufferString(`{"name":"Dave","age":32,"job":"nurse"}`))
+		},
+		func(host string) (*http.Response, error) {
+			return http.Post(host+"/user/upsert", "application/json", bytes.NewBufferString(`{"name":"Dave","age":35,"job":"doctor"}`))
+		},
+		func(host string) (*http.Response, error) { return http.Get(host + "/user?name=Dave") },
+	}
+
+	for _, req := range reqs {
+		resp, err := req("http://localhost:8080")
+		if err != nil {
+			fmt.Println("req err", err)
+		}
+
+		data, err := io.ReadAll(resp.Body)
+		if err != nil {
+			fmt.Println("read resp.Body err", err)
+		}
 		fmt.Println(string(data))
 	}
 
 	// Output:
+	//
 	// {"code":200,"msg":"","data":null}
 	// {"code":200,"msg":"","data":{"name":"Bob","age":30,"job":"driver"}}
 	// {"code":200,"msg":"","data":null}

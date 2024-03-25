@@ -166,20 +166,39 @@ func (c *user) Upsert(ctx context.Context, req *UserUpsertReq) (res *UserUpsertR
 func client() {
 	time.Sleep(time.Second) // 等待路由注册
 
-	resp1, _ := http.Get("http://localhost:8080/user?name=Carol")
-	resp2, _ := http.Get("http://localhost:8080/user?name=Bob")
-	resp3, _ := http.Post("http://localhost:8080/user", "application/json", bytes.NewBufferString(`{"name":"Carol","age":44,"job":"worker"}`))
-	resp4, _ := http.Get("http://localhost:8080/user?name=Carol")
-	resp5, _ := http.Post("http://localhost:8080/user/upsert", "application/json", bytes.NewBufferString(`{"name":"Dave","age":32,"job":"nurse"}`))
-	resp6, _ := http.Post("http://localhost:8080/user/upsert", "application/json", bytes.NewBufferString(`{"name":"Dave","age":35,"job":"doctor"}`))
-	resp7, _ := http.Get("http://localhost:8080/user?name=Dave")
+	reqs := []func(host string) (*http.Response, error){
+		func(host string) (*http.Response, error) { return http.Get(host + "/user?name=Carol") },
+		func(host string) (*http.Response, error) { return http.Get(host + "/user?name=Bob") },
+		func(host string) (*http.Response, error) {
+			return http.Post(host+"/user", "application/json", bytes.NewBufferString(`{"name":"Carol","age":44,"job":"worker"}`))
+		},
+		func(host string) (*http.Response, error) { return http.Get(host + "/user?name=Carol") },
 
-	for _, resp := range []*http.Response{resp1, resp2, resp3, resp4, resp5, resp6, resp7} {
-		data, _ := io.ReadAll(resp.Body)
+		// 测试 upsert 接口
+		func(host string) (*http.Response, error) {
+			return http.Post(host+"/user/upsert", "application/json", bytes.NewBufferString(`{"name":"Dave","age":32,"job":"nurse"}`))
+		},
+		func(host string) (*http.Response, error) {
+			return http.Post(host+"/user/upsert", "application/json", bytes.NewBufferString(`{"name":"Dave","age":35,"job":"doctor"}`))
+		},
+		func(host string) (*http.Response, error) { return http.Get(host + "/user?name=Dave") },
+	}
+
+	for _, req := range reqs {
+		resp, err := req("http://localhost:8080")
+		if err != nil {
+			fmt.Println("req err", err)
+		}
+
+		data, err := io.ReadAll(resp.Body)
+		if err != nil {
+			fmt.Println("read resp.Body err", err)
+		}
 		fmt.Println(string(data))
 	}
 
 	// Output:
+	//
 	// {"code":200,"msg":"","data":null}
 	// {"code":200,"msg":"","data":{"name":"Bob","age":30,"job":"driver"}}
 	// {"code":200,"msg":"","data":null}
@@ -188,7 +207,37 @@ func client() {
 	// {"code":200,"msg":"","data":{"name":"Dave","age":32,"job":"nurse"}}
 	// {"code":200,"msg":"","data":{"name":"Dave","age":35,"job":"doctor"}}
 }
+
 ```
 
-从 `resp567` 的结果来看，先插入了 `Dave` 为 `nurse` 的数据，后面将 `Dave` 修改了 `doctor`，符合预期，说明 `ReqResFunc` 类型测试通过。
+从新增的请求的结果来看，实现了先插入了 `Dave` 为 `nurse` 的数据，后面将 `Dave` 修改了 `doctor`，符合预期，说明 `ReqResFunc` 类型测试通过。
 
+
+## 通过对象注册路由
+事实上，`GoFrame` 还有第三种路由注册方法：[对象注册](https://goframe.org/pages/viewpage.action?pageId=116004922)，向 `*(ghttp.RouterGroup).Bind` 传入一个结构体变量，然后 `GoFrame` 会尝试注册这个结构体上的所有 `ReqResFunc` 类型的方法。这也是通过反射实现的，核心代码也很简短：
+```go
+func ObjectHandler(object any) (handles []gin.HandlerFunc) {
+	v := reflect.ValueOf(object)
+
+	// 如果是结构体, 那么获取这个结构体的指针, 从而遍历到他的所有方法
+	if v.Kind() == reflect.Struct {
+		newValue := reflect.New(v.Type())
+		newValue.Elem().Set(v)
+		v = newValue
+	}
+
+	if v.Kind() != reflect.Pointer {
+		panic("v.Kind() must be reflect.Pointer")
+	}
+
+	t := v.Type()
+	for i := 0; i < t.NumMethod(); i++ {
+		fn := v.MethodByName(t.Method(i).Name) // 所有方法都必须为 ReqResFunc 类型
+		handles = append(handles, ReqResHandle(fn.Interface()))
+	}
+
+	return handles
+}
+```
+
+通过对象注册路由有个缺点，难以为 `HandlerFunc` 绑定 `path` 和 `method`。`GoFrame` 的解决方式是在 `Req`（第二个请求参数）里写 `go tag`，有兴趣的读者，可以察看[「文档：规范参数结构」](https://goframe.org/pages/viewpage.action?pageId=116004922#id-规范路由如何使用-规范参数结构)或自己实现（[`GoFrame` 源码参考](https://github.com/gogf/gf/blob/313d9d138f96b0ed460d47684298a7fb26d3fd75/net/ghttp/ghttp_server_service_object.go#L132)。

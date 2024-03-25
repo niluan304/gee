@@ -39,7 +39,7 @@ func Handle(binder BinderFunc) gin.HandlerFunc {
 }
 
 // ReqResHandle 返回 gin.HandlerFunc
-// 参数 reqResFunc 必须是 func(context.Context, *XXXReq) (*XXXRes, error) 格式
+// 参数 reqResFunc 必须是 func(context.Context, *XXXReq) (*XXXRes, error) 格式，否则会触发 panic
 func ReqResHandle(reqResFunc any) gin.HandlerFunc {
 	f := NewReqResFunc(reqResFunc)
 	return func(c *gin.Context) {
@@ -70,7 +70,7 @@ type ReqResFunc struct {
 }
 
 // NewReqResFunc 返回 ReqResFunc
-// 参数 reqResFunc 必须是 func(context.Context, *XXXReq) (*XXXRes, error) 格式
+// 参数 reqResFunc 必须是 func(context.Context, *XXXReq) (*XXXRes, error) 格式，否则会触发 panic
 func NewReqResFunc(reqRes any) *ReqResFunc {
 	fn := reflect.ValueOf(reqRes)
 	fnType := fn.Type()
@@ -106,4 +106,33 @@ func NewReqResFunc(reqRes any) *ReqResFunc {
 		res: res,
 		err: err,
 	}
+}
+
+// ObjectHandler 通过结构体（对象）注册路由
+// 这个结构体的所有方法都必须为 `ReqResFunc` 格式，否则会触发 panic
+//
+// TODO 解决缺陷：无法为 handles[i] 绑定 `path` 和 `method`
+// 可行的解决方法：
+// 1. 在请求参数 `XXXReq` 里写 tag，参考：https://github.com/gogf/gf/blob/313d9d138f96b0ed460d47684298a7fb26d3fd75/net/ghttp/ghttp_server_service_object.go#L132
+func ObjectHandler(object any) (handles []gin.HandlerFunc) {
+	v := reflect.ValueOf(object)
+
+	// 如果是结构体, 那么获取这个结构体的指针, 从而遍历到他的所有方法
+	if v.Kind() == reflect.Struct {
+		newValue := reflect.New(v.Type())
+		newValue.Elem().Set(v)
+		v = newValue
+	}
+
+	if v.Kind() != reflect.Pointer {
+		panic("v.Kind() must be reflect.Pointer")
+	}
+
+	t := v.Type()
+	for i := 0; i < t.NumMethod(); i++ {
+		fn := v.MethodByName(t.Method(i).Name) // 所有方法都必须为 ReqResFunc 类型
+		handles = append(handles, ReqResHandle(fn.Interface()))
+	}
+
+	return handles
 }
