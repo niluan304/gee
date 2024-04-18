@@ -2,11 +2,9 @@ package handle
 
 import (
 	"context"
-	"net/http"
+	"fmt"
 	"reflect"
 	"strings"
-
-	"github.com/gin-gonic/gin"
 )
 
 type ReqResFunc struct {
@@ -42,11 +40,24 @@ func NewReqResFunc(reqRes any) *ReqResFunc {
 		panic("the second return value must be error")
 	}
 
-	if !strings.HasSuffix(req.String(), "Req") {
-		panic("the name of second parameter must be XXXReq")
+	// req.Kind() must be *Struct
+	// todo add Struct
+	if req.Kind() == reflect.Pointer && req.Elem().Kind() == reflect.Struct {
+		if !strings.HasSuffix(req.String(), "Req") {
+			panic(fmt.Sprintf(`invalid struct name for request: defined as "%s", but it should be named with "Res" suffix like "XxxReq" or "*XxxReq"`, req.String()))
+		}
+	} else {
+		panic(fmt.Sprintf(`invalid handler: defined as "%s", but type of the  second input parameter should be like "BizReq" or "*BizReq"`, req.String()))
 	}
-	if !strings.HasSuffix(res.String(), "Res") {
-		panic("the name of first return value must be XXXRes")
+
+	// res.Kind() must be Struct or *Struct
+	if res.Kind() == reflect.Struct ||
+		(res.Kind() == reflect.Pointer && res.Elem().Kind() == reflect.Struct) {
+		if !strings.HasSuffix(res.String(), "Res") {
+			panic(fmt.Sprintf(`invalid struct name for request: defined as "%s", but it should be named with "Res" suffix like "XxxRes" or "*XxxReq"`, res.String()))
+		}
+	} else {
+		panic(fmt.Sprintf(`invalid handler: defined as "%s", but type of the first output parameter should be "BizRes" or "*BizRes"`, res.String()))
 	}
 
 	return &ReqResFunc{
@@ -58,25 +69,29 @@ func NewReqResFunc(reqRes any) *ReqResFunc {
 	}
 }
 
-func (f *ReqResFunc) Handler() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		req := reflect.New(f.req).Interface() // 使用 reflect.New 初始化变量
+func (f *ReqResFunc) Call(ctx context.Context, decode func(point any) error) (any, error) {
+	req := reflect.New(f.req.Elem())
+	point := req.Interface()
 
-		if err := c.ShouldBindJSON(req); err != nil {
-			c.JSON(http.StatusOK, Response{Code: 400, Msg: err.Error(), Data: nil})
-			return
-		}
-
-		result := f.fn.Call([]reflect.Value{reflect.ValueOf(c), reflect.ValueOf(req).Elem()})
-		if err := result[1]; !err.IsNil() {
-			c.JSON(http.StatusOK, Response{Code: 400, Msg: err.Interface().(error).Error(), Data: nil})
-		}
-
-		c.JSON(http.StatusOK, Response{200, "", result[0].Interface()})
+	if err := decode(point); err != nil {
+		return nil, err
 	}
+
+	result := f.fn.Call([]reflect.Value{reflect.ValueOf(ctx), req})
+	if err := result[1]; !err.IsNil() {
+		return nil, err.Interface().(error)
+	}
+	return result[0].Interface(), nil
 }
 
-func (f *ReqResFunc) Ctx() reflect.Type { return f.ctx }
-func (f *ReqResFunc) Req() reflect.Type { return f.req }
+func (f *ReqResFunc) DecodeFunc() DecodeFunc {
+	return f.Call
+}
+
+func (f *ReqResFunc) Req() reflect.Type {
+	if f.req.Kind() == reflect.Pointer {
+		return f.req.Elem()
+	}
+	return f.req
+}
 func (f *ReqResFunc) Res() reflect.Type { return f.res }
-func (f *ReqResFunc) Err() reflect.Type { return f.err }

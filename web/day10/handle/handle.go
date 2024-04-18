@@ -12,15 +12,13 @@ type Response struct {
 	Data any    `json:"data"` // 返回的数据
 }
 
-func Handle(binder BinderFunc) gin.HandlerFunc {
-	return binder.Handler()
-}
+const (
+	CodeOK         = 200 // 业务正常
+	CodeBadRequest = 400 // 请求参数异常
+)
 
-// ReqResHandle 返回 gin.HandlerFunc
-// 参数 reqResFunc 必须是 func(context.Context, *XXXReq) (*XXXRes, error) 格式，否则会触发 panic
-func ReqResHandle(reqResFunc any) gin.HandlerFunc {
-	f := NewReqResFunc(reqResFunc)
-	return f.Handler()
+func Handle(decode DecodeFunc) gin.HandlerFunc {
+	return decode.Handler()
 }
 
 // ObjectHandler 通过结构体（对象）注册路由

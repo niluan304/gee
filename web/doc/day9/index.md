@@ -16,49 +16,38 @@ categories: go
 
 经过分层处理后，项目布局有了很大改善，但是仍然存在问题。
 1. `controller` 层的错误处理代码特别繁琐，有太多的：`ctx.JSON(http.StatusOK, Response{400, err.Error(), nil})`
-2. `controller` 层只支持 `gin` 框架，更不支持其他协议
+2. `controller` 层只支持 `Gin` 框架，更不支持其他协议
 
 
 ## 让调用者帮忙反序列化
 观察 `controller` 层可以得出一个结论：`controller` 的需求其实很简单：反序列化为 `service` 层所需要 `go` 类型，并在  `err != nil` 时做控制的流转。
 
-那么该怎么实现呢？这其实并不难。
-
-不知道是否有读者会好奇 `Get` 方法里的搜索函数：
+那么该怎么实现呢？这其实并不难。说到反序列化，笔者相信各位都非常熟悉标准库的 `json.Unmarshal(data []byte, v any) error`，`json.Unmarshal` 要求传入 `JSON` 编码的数据源和接收变量的指针，反序列化需要两个最基本的源：数据源和接收源。如果数据源是 `r io.Reader`类型，还可以直接使用标准库装好的方法： 
 ```go
-// ./day8/internal/service/user.go
-
-i := slices.IndexFunc(database, func(row Row) bool { 
-    return row.Name == req.Name
-})
+dec := json.NewDecoder(r)
+err := dec.Decode(point)
 ```
-只需要往 `slices.IndexFunc` 传入了一个闭包，就可以等待函数返回所在值的索引，`slices.IndexFunc`的实现，也同样简单：
-```go
-// std: slices/slices.go
 
-// IndexFunc returns the first index i satisfying f(s[i]),
-// or -1 if none do.
-func IndexFunc[S ~[]E, E any](s S, f func(E) bool) int {
-	for i := range s {
-		if f(s[i]) {
-			return i
-		}
-	}
-	return -1
+笔者提及 `func (dec *Decoder) Decode(v any) error` 有什么用呢？回顾一下 day8 的 `controller` 层代码：
+```go
+func (c *user) Get(ctx *gin.Context) {
+	var req *service.UserGetReq
+	err := ctx.ShouldBindUri(&req)
+	...
 }
 ```
 
-但让我们换个角度思考，对于 `slices.IndexFunc` 来说，它并不关心 `s` 里的元素，只关心 `f(s[i])` 的结果，因此只需要调用传入的闭包，就完成了任务。同样地，对于 `controller` 层来说，只关心反序列化 `var req service.UserGetReq`。那么能否仿照 `slices.IndexFunc` 让外部传入一个闭包，让闭包帮 `controller` 层反序列化 `req`呢？答案是可以的，只需要修改 `controller` 的入参为：
+很明显接收源是 `var req *service.UserGetReq`，而 `ctx.ShouldBindUri(&req)` 与 `dec.Decode(point)` 高度相似，甚至函数类型都是：`func(point any) error`。分析一下，对于 `*json.Decoder` 和 `*gin.Context` 来说，数据源都被隐藏在结构体内部了，真正关键的，是反序列化的入口函数：`ShouldBindUri` 和 `Decode`，因此是可以将 `ctx *gin.Context` 替换为 `decode func(point any) error` 的，外部传入这个闭包，`controller` 层调用闭包，完成反序列化。修改之后的函数签名：
 ```go
 func (c *user) Get(
 	ctx context.Context,               // 第一个参数：ctx
-	bind func(point any) (err error),  // 第二个参数：用于反序列化的闭包
+	decode func(point any) (err error),  // 第二个参数：用于反序列化的闭包
 ) (
 	data any,  // 返回的数据
 	err error, // 错误处理
 ){
 	var req service.UserGetReq
-	err = bind(&req) // 通过闭包反序列化 req
+	err = decode( &req) // 通过闭包反序列化 req
 	if err != nil {
 		return nil, err
 	}
@@ -71,34 +60,40 @@ func (c *user) Get(
 }
 ```
 
-经过改动的 `controller` 和 web框架彻底解耦了，完全看不到 `gin` 框架的代码，毕竟反序列化的工作也并不是 `controller` 的任务，错误处理和数据返回也变得非常简单，只需要抛给上层处理（要么 `return nil, err`，要么 `return res, nil`），解耦之后也为 `controller` 层兼容多种协议带来了可能。
+经过改动的 `controller` 和 web框架彻底解耦了，完全看不到 `Gin` 框架的代码，毕竟反序列化的工作也并不是 `controller` 的任务，错误处理和数据返回也变得非常简单，只需要抛给上层处理（要么 `return nil, err`，要么 `return res, nil`），解耦之后也为 `controller` 层兼容多种协议带来了可能。
 
-不过但也带来了一个问题：这样的函数，该如何注册到 `gin`框架里呢？
+不过但也带来了一个问题：这样的函数，该如何注册到 `Gin`框架里呢？
 
 
 ## 统一错误处理和数据返回
+> All problems in computer science can be solved by another level of indirection.
+>
+> 计算机科学领域的任何问题都可以通过增加一个间接的中间层来解决。
+
 阐述这部分内容之前，笔者想简单的介绍一下「设计模式」里的「适配器模式」[^1]：
 [^1]:[适配器模式](https://www.yuque.com/aceld/lfhu8y/vnhf4b#gVTIW)
 
 简单来讲，就是通过接口转换，让两个不兼容的接口，能够一起工作，现实中的经典例子：
 ![](image.png)
 
+
+
 和上面的图片类似，修改后的函数类型已经和框架要求的 `gin.HandlerFunc` 截然不同，但借鉴适配器模式的思想，通过中间函数转化，就可以了：
 ```go
 // ./handle/handle.go
 
 // 设置为类型，用于优化参数显示
-type BinderFunc = func(
+type DecodeFunc = func(
 	ctx context.Context,               // 第一个参数：ctx
-	bind func(point any) (err error), // 第二个参数：用于反序列化的闭包
+	decode func(point any) (err error), // 第二个参数：用于反序列化的闭包
 ) (
 	data any,  // 返回的数据
 	err error, // 错误处理
 )
 
-func Handle(binder BinderFunc) gin.HandlerFunc {
+func Handle(decode DecodeFunc) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data, err := binder(c, func(point any) (err error) {
+		data, err := decode(c, func(point any) (err error) {
 			// 实现反序列化
 			return c.ShouldBind(point)
 		})
@@ -113,7 +108,7 @@ func Handle(binder BinderFunc) gin.HandlerFunc {
 
 ```
 
-新的函数作为「适配器」，也会被其他路由调用，也不是业务相关的内容，不适合放到 `interna`l 包，应当放到新的包（文件夹）里，笔者将之保存至 `/handle/handle.go`。
+新的函数作为「适配器」，也会被其他路由调用，也不是业务相关的内容，不适合放到 `internal` 包，应当放到新的包（文件夹）里，笔者将之保存至 `/handle/handle.go`。
 
 相应地，路由注册也有些变化：
 ```go
@@ -135,14 +130,19 @@ user.GET("/", controller.User.Get)  // 函数签名：func (c *user) Get(ctx *gi
 user.POST("/", controller.User.Add) // 函数签名：func (c *user) Add(ctx *gin.Context)
 ```
 
-虽然注册路由时，必须得借用 `handle.Handle` 才能转化为 `gin.HandlerFunc`，但是可以不用在 `controller`层里写 `c.JSON(http.StatusOK, Response{Code: 400, Msg: err.Error(), Data: nil})` 和 `c.JSON(http.StatusOK, Response{200, "", data})` 了。至此，我们就完成了错误处理和数据返回的统一。
+虽然注册路由时，必须得借用 `handle.Handle` 才能转化为 `gin.HandlerFunc`，但是可以不用在 `controller` 层里写：
+```go
+c.JSON(http.StatusOK, Response{Code: 400, Msg: err.Error(), Data: nil})
+c.JSON(http.StatusOK, Response{200, "", data})
+```
+至此，我们就完成了错误处理和数据返回的统一。
 
 
 
 ## 小结
 本章节主要做了两件事：
-1. `controller` 层通过传入 `binder` 闭包，调用闭包实现反序列化出 `service` 层所需数据，也完成了 `controller` 与框架的解耦，日后可以兼容其他框架（如 echo）和其他协议（如 rpc）。
-2. 借鉴适配器模式，将 `binderFunc` 函数转化为框架所需要的类型，并实现错误处理和数据返回的统一。
+1. `controller` 层通过传入 `decode` 闭包，调用闭包实现反序列化出 `service` 层所需数据，也完成了 `controller` 与框架的解耦，日后可以兼容其他框架（如 echo）和其他协议（如 rpc）。
+2. 借鉴适配器模式，将 `DecodeFunc` 函数转化为框架所需要的类型，并实现错误处理和数据返回的统一。
 
 运行结果也没有变化：
 ```go

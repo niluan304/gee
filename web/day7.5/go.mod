@@ -1,4 +1,4 @@
-module gee/web/day10
+module gee/web/day7.5
 
 go 1.20
 

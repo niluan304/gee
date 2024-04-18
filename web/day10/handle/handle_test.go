@@ -8,7 +8,7 @@ import (
 	"time"
 	"unicode"
 
-	"gee/web/day8/handle"
+	"gee/web/day10/handle"
 
 	"github.com/gin-gonic/gin"
 )
@@ -25,7 +25,7 @@ func TestObjectHandler(t *testing.T) {
 
 	go func() {
 		// 等待路由注册
-		time.Sleep(time.Second * 2)
+		time.Sleep(time.Second)
 
 		http.Get("http://localhost:8080/gf/hello-world")
 		http.Post("http://localhost:8080/gf/hello-world", "application/json", nil)
@@ -34,20 +34,20 @@ func TestObjectHandler(t *testing.T) {
 		http.Post("http://localhost:8080/iris/hello/world", "application/json", nil)
 
 		// 等待打印请求响应
-		time.Sleep(time.Second * 2)
+		time.Sleep(time.Second)
 		server.Shutdown(context.TODO())
 	}()
 
 	// 根据结构体的 tag 注册路由
 	gf := r.Group("/gf")
 	handle.ObjectHandler(Hello{}, func(f *handle.ReqResFunc, methodName string) {
-		field, find := f.Req().Elem().FieldByName("meta")
+		field, find := f.Req().FieldByName("meta")
 		if !find {
 			panic("req must be contain meta filed")
 		}
 
 		tag := field.Tag
-		gf.Handle(strings.ToUpper(tag.Get("method")), tag.Get("path"), f.Handler())
+		gf.Handle(strings.ToUpper(tag.Get("method")), tag.Get("path"), f.DecodeFunc().Handler())
 	})
 
 	// 根据方法名注册路由
@@ -62,7 +62,7 @@ func TestObjectHandler(t *testing.T) {
 		}
 		path := string(name)[1:]
 		i := strings.Index(path, "/")
-		iris.Handle(strings.ToUpper(path[:i]), path[i:], f.Handler())
+		iris.Handle(strings.ToUpper(path[:i]), path[i:], f.DecodeFunc().Handler())
 	})
 }
 
@@ -74,6 +74,8 @@ type (
 
 	HelloPostReq struct {
 		meta struct{} `method:"POST" path:"/hello-world" `
+		Name string
+		Age  int
 	}
 	HelloPostRes struct{}
 )

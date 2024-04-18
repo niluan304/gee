@@ -12,7 +12,7 @@ tags: [gee,web]
 categories: go
 ---
 
-跟着这篇教程 [7天用Go从零实现Web框架Gee教程 | 极客兔兔](https://geektutu.com/post/gee.html)，笔者实现了一个简单的 web框架，从而明白了 web框架所需要的特性，还迸发出封装 `gin` 的想法。
+跟着这篇教程 [7天用Go从零实现Web框架Gee教程 | 极客兔兔](https://geektutu.com/post/gee.html)，笔者实现了一个简单的 web框架，从而明白了 web框架所需要的特性，还迸发出封装 `Gin` 的想法。
 
 ## web框架 所需要的特性
 
@@ -22,7 +22,9 @@ categories: go
 
 ### 中间件
 
-中间件 (Middleware)是 web 框架的灵魂，为 web 框架提供无限的扩展能力。有了中间件，可以只对 `admin` 和 `api` 分组进行鉴权，对特定接口限流。对最顶层目录 "/"，也就是整个系统，可以配置日志，请求耗时等功能。
+中间件 (Middleware)是 web 框架的灵魂，为 web 框架提供无限的扩展能力。有了中间件，可以只对 `admin` 和 `api` 分组进行鉴权，对特定接口限流。
+
+对最顶层目录 "/"，也就是整个系统，可以配置日志，请求耗时等功能，也可以设置最小粒度的中间件 ———— 为业务代码绑定具体的路由（路由注册其实就是设置作用域只有路由的中间件）。
 
 ### 动态路由
 
@@ -31,15 +33,15 @@ categories: go
 - 可读性和可维护性：现阶段的动态路由可以有多个参数，如 `/user/:name/article/:articleId`，可读性和可维护性明显高于 `user/article?name=zwei&?articleId=1234`。
 - 可拓展性：动态路由可以使用前缀进行分组，这样可以很容易添加和修改同一分组下的中间件。
 
-## `gin` 与 `GoFrame` 的差异
-实现简易web框架之后，才算理解 `gin` 的中间件与业务代码的格式为什么必须为：
+## `Gin` 与 `GoFrame` 的差异
+实现简易web框架之后，才算理解 `Gin` 的中间件与 `controller` 的格式为什么必须为：
 ```go
 func(c *gin .Context) {
     // 中间件 或 业务代码逻辑
 }
 ```
 
-但是这和笔者最熟悉的 `GoFrame` 框架有一些差异，`GoFrame` 还额外支持另一种写法：
+这和笔者最熟悉的 `GoFrame` 框架有一些差异，`GoFrame` 的 `controller` 还额外支持另一种写法：
 ```go
 // 中间件式写法，类似 gin  的 func(c *gin .Context)
 func (r *ghttp.Request) {
@@ -52,7 +54,7 @@ func (ctx context.Context, req *{Prefix}Req) (res *{Prefix}Res, err error){
 }
 ```
 
-带着疑问，笔者探究了两个框架之间的差异，并尝试将 `gin` 的接口改造为 `GoFrame` 格式。
+带着疑问，笔者探究了两个框架之间的差异，并尝试将 `Gin` 的接口改造为 `GoFrame` 格式。
 总结后可以概括为三个部分，这算是「7天教程」的读后感，笔者也仿照命名为：
 - day8 分层设计的必要性
 - day9 反序列化与解耦
